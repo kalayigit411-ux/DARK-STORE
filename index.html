@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dark Store</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #b16cea;
+            --primary-glow: rgba(177, 108, 234, 0.5);
+            --bg-color: #05030a; 
+            --bg-gradient: radial-gradient(circle at 50% 0%, #2a103c 0%, #05030a 80%);
+            --glass-bg: rgba(25, 15, 35, 0.6);
+            --glass-border: rgba(177, 108, 234, 0.2);
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            background-color: var(--bg-color); 
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main); 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        .screen { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; z-index: 1; }
+        .screen.active { opacity: 1; pointer-events: auto; z-index: 10; }
+        .hidden { display: none !important; }
+
+        /* --- GİRİŞ EKRANI --- */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; }
+        .top-nav-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; padding: 8px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; backdrop-filter: blur(10px); }
+        
+        .login-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 20px; }
+        
+        .brand-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(177, 108, 234, 0.15); border: 1px solid var(--primary-glow); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; width: fit-content; margin: 0 auto 20px auto; backdrop-filter: blur(5px); color: var(--primary); }
+        
+        .welcome-title { font-size: 26px; font-weight: 700; margin-bottom: 25px; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+        .auth-box { background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 25px; border-radius: 20px; backdrop-filter: blur(20px); box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+        .input-group { text-align: left; margin-bottom: 15px; }
+        .input-group label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block; }
+        .input-field { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); padding: 14px 15px; border-radius: 10px; color: white; font-size: 14px; outline: none; transition: 0.3s; }
+        .input-field:focus { border-color: var(--primary); background: rgba(0,0,0,0.7); }
+
+        .btn-primary { background: rgba(177, 108, 234, 0.2); color: #fff; border: 1px solid var(--primary); padding: 16px; border-radius: 12px; font-size: 15px; font-weight: 600; text-align: center; width: 100%; display: flex; justify-content: center; align-items: center; transition: 0.2s; backdrop-filter: blur(10px); cursor: pointer; margin-top: 10px; }
+        .btn-primary:active { background: rgba(177, 108, 234, 0.4); transform: scale(0.98); }
+        
+        .btn-outline { background: transparent; color: white; border: 1px solid var(--glass-border); padding: 16px; border-radius: 12px; font-size: 15px; font-weight: 600; text-align: center; width: 100%; display: flex; justify-content: center; align-items: center; transition: 0.2s; backdrop-filter: blur(10px); cursor: pointer; margin-top: 10px; }
+        .btn-outline:active { background: rgba(255,255,255,0.08); transform: scale(0.98); }
+
+        .error-msg { color: #ff4d4d; font-size: 13px; margin-top: 10px; text-align: center; font-weight: 600; display: none; }
+        .toggle-text { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 20px; cursor: pointer; }
+        .toggle-text span { color: var(--primary); font-weight: bold; }
+
+        /* --- MAĞAZA EKRANI --- */
+        .store-header { text-align: center; margin-top: 30px; margin-bottom: 20px; padding: 0 20px; }
+        .store-header h1 { font-size: 16px; color: var(--text-muted); font-weight: 500; }
+        .store-header h2 { font-size: 32px; color: var(--primary); text-shadow: 0 0 25px var(--primary-glow); margin-top: 5px; font-weight: 900; letter-spacing: 1px; }
+
+        .store-content { padding: 0 20px; flex: 1; overflow-y: auto; padding-bottom: 30px; }
+        .store-content::-webkit-scrollbar { display: none; }
+
+        .game-card { 
+            background: rgba(20, 10, 30, 0.5); 
+            border: 1px solid var(--glass-border); 
+            padding: 25px 20px; 
+            border-radius: 20px; 
+            margin-bottom: 15px; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: center;
+            cursor: pointer; 
+            transition: 0.3s; 
+            backdrop-filter: blur(15px); 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .game-card.pubg { background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(20, 10, 30, 0.6) 100%); border-left: 3px solid #ff8c00; }
+        .game-card.oxide { background: linear-gradient(135deg, rgba(0, 255, 128, 0.1) 0%, rgba(20, 10, 30, 0.6) 100%); border-left: 3px solid #00ff80; }
+
+        .game-card:active { transform: scale(0.98); border-color: var(--primary); }
+        .game-card h3 { font-size: 22px; font-weight: 800; margin-bottom: 5px; letter-spacing: 1px; }
+        .game-card p { font-size: 12px; color: var(--text-muted); }
+        
+        .game-tag { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; }
+
+        /* --- İÇERİK (PUBG / OXIDE) --- */
+        .inner-nav { padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .back-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; padding: 8px 14px; border-radius: 10px; font-size: 13px; cursor: pointer; backdrop-filter: blur(10px); }
+        .logout-btn { background: rgba(255, 50, 50, 0.1); border: 1px solid rgba(255, 50, 50, 0.3); color: #ff6b6b; padding: 8px 14px; border-radius: 10px; font-size: 13px; cursor: pointer; }
+        
+        .inner-title { text-align: center; font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 20px; text-shadow: 0 0 15px var(--primary-glow); }
+
+        .item-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); color: white; padding: 16px; border-radius: 12px; width: 100%; margin-bottom: 12px; font-size: 15px; font-weight: 600; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 10px; backdrop-filter: blur(10px); cursor: pointer;}
+        .item-btn:active { background: rgba(177, 108, 234, 0.2); border-color: var(--primary); transform: scale(0.98); }
+        
+        .z-red { color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.6); font-weight: 900; }
+        
+        .price-card { 
+            background: rgba(177, 108, 234, 0.08); border: 1px solid var(--primary-glow); 
+            padding: 16px; border-radius: 12px; margin-bottom: 10px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            opacity: 0; transform: scale(0.95); transition: 0.5s; backdrop-filter: blur(10px);
+            cursor: pointer;
+        }
+        .price-card:active { background: rgba(177, 108, 234, 0.3); transform: scale(0.98); }
+        .price-card.show { opacity: 1; transform: scale(1); }
+        
+        .price-title { font-weight: 600; font-size: 14px; }
+        .price-value { color: #fff; background: var(--primary); padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 13px; box-shadow: 0 0 10px var(--primary-glow); display: flex; align-items: center; gap: 5px; }
+        .price-value::after { content: 'Satın Al'; font-size: 10px; opacity: 0.9; margin-left: 5px; font-weight: 600; }
+
+        @keyframes fadeIn { to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" class="screen active">
+        <div class="login-content">
+            <div class="brand-badge">✨ DARK STORE</div>
+            <div class="welcome-title">Mağazaya Erişmek İçin<br>Giriş Yapın</div>
+            
+            <div class="auth-box">
+                <div id="login-form">
+                    <div class="input-group">
+                        <label>Kullanıcı Adınız</label>
+                        <input type="text" id="login-username" class="input-field" placeholder="İsim girin">
+                    </div>
+                    <div class="input-group">
+                        <label>Şifreniz</label>
+                        <input type="password" id="login-password" class="input-field" placeholder="Şifre girin">
+                    </div>
+                    <div id="login-error" class="error-msg">Kullanıcı adı veya şifre yanlış!</div>
+                    <button class="btn-primary" onclick="handleLogin()">Giriş Yap</button>
+                </div>
+
+                <div id="register-form" class="hidden">
+                    <div class="input-group">
+                        <label>Kullanıcı Adı Belirleyin</label>
+                        <input type="text" id="reg-username" class="input-field" placeholder="İsim girin">
+                    </div>
+                    <div class="input-group">
+                        <label>Şifre Belirleyin</label>
+                        <input type="password" id="reg-password" class="input-field" placeholder="Şifre girin">
+                    </div>
+                    <div id="reg-error" class="error-msg">Bu kullanıcı adı zaten alınmış!</div>
+                    <button class="btn-primary" onclick="handleRegister()">Kayıt Ol ve Gir</button>
+                </div>
+
+                <div class="toggle-text" id="toggle-auth" onclick="toggleAuthMode()">
+                    Hesabınız yok mu? <span>Kayıt Olun</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="store-screen" class="screen">
+        <div class="inner-nav">
+            <div></div>
+            <button class="logout-btn" onclick="handleLogout()">Çıkış Yap</button>
+        </div>
+        <div class="store-header">
+            <h1>Kalitenin Adresi....</h1>
+            <h2>DARK STORE</h2>
+        </div>
+        
+        <div class="store-content">
+            <div class="game-card pubg" onclick="showPubg()">
+                <div class="game-tag">ANDROID</div>
+                <h3>PUBG MOBILE</h3>
+                <p>Rekabetin bir adım önünde.</p>
+            </div>
+            
+            <div class="game-card oxide" onclick="showOxide()">
+                <div class="game-tag">ANDROID</div>
+                <h3>OXIDE ISLAND</h3>
+                <p>Kendi kurallarınla hayatta kal.</p>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                <a href="https://t.me/VEGASxH4" class="btn-outline" target="_blank">👨‍💻 Geliştirici (@VEGASxH4)</a>
+                <a href="https://t.me/VEGASxH4" class="btn-outline" target="_blank">💬 Destek / İletişim</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="pubg-screen" class="screen">
+        <div class="inner-nav">
+            <button class="back-btn" onclick="goToStore()">< Geri</button>
+            <button class="logout-btn" onclick="handleLogout()">Çıkış</button>
+        </div>
+        <h2 class="inner-title">PUBG MOBILE</h2>
+        
+        <div class="store-content">
+            <button id="pubg-android-btn" class="item-btn" onclick="showPubgZmod()">Android Seçeneği</button>
+            
+            <div id="pubg-zmod-area" class="hidden" style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="item-btn" onclick="showPubgPrices()" style="font-size: 18px;">
+                    <span class="z-red">Z</span> <span style="color:white;">MOD</span>
+                </button>
+            </div>
+            
+            <div id="pubg-prices" class="hidden" style="margin-top: 20px;">
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 DAY Z MOD</span>
+                    <span class="price-value">250 🌟</span>
+                </div>
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 WEEK Z MOD</span>
+                    <span class="price-value">1200 🌟</span>
+                </div>
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 MONTH Z MOD</span>
+                    <span class="price-value">4500 🌟</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="oxide-screen" class="screen">
+        <div class="inner-nav">
+            <button class="back-btn" onclick="goToStore()">< Geri</button>
+            <button class="logout-btn" onclick="handleLogout()">Çıkış</button>
+        </div>
+        <h2 class="inner-title">OXIDE ISLAND</h2>
+        
+        <div class="store-content">
+            <button id="oxide-android-btn" class="item-btn" onclick="showOxideOptions()">Android Seçeneği</button>
+            
+            <div id="oxide-options" class="hidden" style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="item-btn" onclick="showOxidePrices('CRY4M')">CRY4M</button>
+                <button class="item-btn" onclick="showOxidePrices('MAGIC')">MAGIC</button>
+                <button class="item-btn" onclick="showOxidePrices('LEBRO')">LEBRO</button>
+            </div>
+
+            <div id="oxide-prices" class="hidden" style="margin-top: 20px;">
+                <h3 id="oxide-selected-title" style="color: white; margin-bottom: 15px; text-align: center; font-size: 16px;"></h3>
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 DAY</span>
+                    <span class="price-value">250 🌟</span>
+                </div>
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 WEEK</span>
+                    <span class="price-value">1850 🌟</span>
+                </div>
+                <div class="price-card" onclick="buyNow()">
+                    <span class="price-title">1 MONTH</span>
+                    <span class="price-value">6500 🌟</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        let isLoginMode = true;
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('login-error').style.display = 'none';
+            document.getElementById('reg-error').style.display = 'none';
+            
+            if(isLoginMode) {
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('toggle-auth').innerHTML = 'Hesabınız yok mu? <span>Kayıt Olun</span>';
+            } else {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.remove('hidden');
+                document.getElementById('toggle-auth').innerHTML = 'Zaten hesabınız var mı? <span>Giriş Yapın</span>';
+            }
+        }
+
+        function handleRegister() {
+            let user = document.getElementById('reg-username').value.trim();
+            let pass = document.getElementById('reg-password').value.trim();
+            let err = document.getElementById('reg-error');
+
+            if(!user || !pass) {
+                err.innerText = "Lütfen tüm alanları doldurun.";
+                err.style.display = 'block';
+                return;
+            }
+
+            let existingUser = localStorage.getItem('ds_user');
+            if(existingUser) {
+                let parsed = JSON.parse(existingUser);
+                if(parsed.username === user) {
+                    err.innerText = "Bu kullanıcı adı zaten alınmış!";
+                    err.style.display = 'block';
+                    return;
+                }
+            }
+
+            localStorage.setItem('ds_user', JSON.stringify({ username: user, password: pass }));
+            localStorage.setItem('ds_logged_in', 'true');
+            goToStore();
+        }
+
+        function handleLogin() {
+            let user = document.getElementById('login-username').value.trim();
+            let pass = document.getElementById('login-password').value.trim();
+            let err = document.getElementById('login-error');
+
+            if(!user || !pass) {
+                err.innerText = "Lütfen tüm alanları doldurun.";
+                err.style.display = 'block';
+                return;
+            }
+
+            let existingUser = localStorage.getItem('ds_user');
+            if(existingUser) {
+                let parsed = JSON.parse(existingUser);
+                if(parsed.username === user && parsed.password === pass) {
+                    localStorage.setItem('ds_logged_in', 'true');
+                    goToStore();
+                } else {
+                    err.innerText = "Kullanıcı adı veya şifre yanlış!";
+                    err.style.display = 'block';
+                }
+            } else {
+                err.innerText = "Kayıtlı kullanıcı bulunamadı. Lütfen kayıt olun.";
+                err.style.display = 'block';
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('ds_logged_in');
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('auth-screen').classList.add('active');
+            document.getElementById('login-password').value = '';
+        }
+
+        function switchScreen(hideId, showId) {
+            document.getElementById(hideId).classList.remove('active');
+            document.getElementById(showId).classList.add('active');
+        }
+
+        function goToStore() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('store-screen').classList.add('active');
+        }
+
+        window.onload = () => {
+            if(localStorage.getItem('ds_logged_in') === 'true') {
+                goToStore();
+            }
+        };
+
+        function showPubg() {
+            switchScreen('store-screen', 'pubg-screen');
+            document.getElementById('pubg-android-btn').classList.remove('hidden');
+            document.getElementById('pubg-zmod-area').classList.add('hidden');
+            document.getElementById('pubg-prices').classList.add('hidden');
+        }
+        
+        function showPubgZmod() {
+            document.getElementById('pubg-android-btn').classList.add('hidden');
+            document.getElementById('pubg-zmod-area').classList.remove('hidden');
+        }
+        
+        function showPubgPrices() {
+            document.getElementById('pubg-zmod-area').classList.add('hidden');
+            const priceList = document.getElementById('pubg-prices');
+            priceList.classList.remove('hidden');
+            
+            const items = priceList.querySelectorAll('.price-card');
+            items.forEach((item, index) => {
+                item.classList.remove('show');
+ 
